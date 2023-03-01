@@ -1,6 +1,6 @@
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, Field
 from queue import Queue
 from threading import Lock
 from typing import Optional
@@ -11,15 +11,14 @@ from .message_pool import MessagePool
 from .message_type import RelayMessageType
 from .subscription import Subscription
 
+
 @dataclass
 class RelayPolicy:
     should_read: bool = True
     should_write: bool = True
-    
+
     def to_json_object(self) -> dict[str, bool]:
         return {"read": self.should_read, "write": self.should_write}
-
-
 
 
 @dataclass
@@ -29,12 +28,11 @@ class RelayProxyConnectionConfig:
     type: Optional[str] = None
 
 
-
 @dataclass
 class Relay:
     url: str
     message_pool: MessagePool
-    policy: RelayPolicy = RelayPolicy()
+    policy: RelayPolicy = Field(default_factory=RelayPolicy())
     ssl_options: Optional[dict] = None
     proxy_config: RelayProxyConnectionConfig = None
 
@@ -52,15 +50,21 @@ class Relay:
             on_open=self._on_open,
             on_message=self._on_message,
             on_error=self._on_error,
-            on_close=self._on_close
+            on_close=self._on_close,
         )
 
     def connect(self):
         self.ws.run_forever(
             sslopt=self.ssl_options,
-            http_proxy_host=self.proxy_config.host if self.proxy_config is not None else None, 
-            http_proxy_port=self.proxy_config.port if self.proxy_config is not None else None,
-            proxy_type=self.proxy_config.type if self.proxy_config is not None else None,
+            http_proxy_host=self.proxy_config.host
+            if self.proxy_config is not None
+            else None,
+            http_proxy_port=self.proxy_config.port
+            if self.proxy_config is not None
+            else None,
+            proxy_type=self.proxy_config.type
+            if self.proxy_config is not None
+            else None,
         )
 
     def close(self):
@@ -78,7 +82,7 @@ class Relay:
 
     def publish(self, message: str):
         self.queue.put(message)
-        
+
     def queue_worker(self):
         while True:
             if self.connected:
@@ -122,7 +126,7 @@ class Relay:
 
     def _on_message(self, class_obj, message: str):
         self.message_pool.add_message(message, self.url)
-    
+
     def _on_error(self, class_obj, error):
         self.connected = False
         self.error_counter += 1
